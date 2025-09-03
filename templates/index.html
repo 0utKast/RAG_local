@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador Semántico de Documentos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Buscador Semántico de Documentos</h1>
+        <p>Sube un archivo PDF para añadirlo a la base de conocimiento.</p>
+
+        <div class="card">
+            <h2>1. Cargar Documento (PDF)</h2>
+            <div id="upload-container">
+                <input type="file" id="file-input" accept=".pdf">
+                <button id="upload-button">Subir Archivo</button>
+            </div>
+            <div id="upload-status"></div>
+        </div>
+
+        <div class="card">
+            <h2>2. Realizar una Pregunta</h2>
+            <div id="query-container">
+                <input type="text" id="query-input" placeholder="Escribe tu pregunta sobre los documentos...">
+                <button id="query-button">Preguntar</button>
+            </div>
+            <div class="llm-selector-container">
+                <label for="llm-selector">Elige el modelo a usar:</label>
+                <select id="llm-selector">
+                    <option value="gemini" selected>Gemini (Remoto)</option>
+                    <option value="ollama">Ollama (Local)</option>
+                </select>
+            </div>
+            <div id="query-result-container">
+                <h3>Respuesta:</h3>
+                <div id="query-result" class="result-box">
+                    <p>La respuesta aparecerá aquí...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

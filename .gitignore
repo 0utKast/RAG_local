@@ -1,0 +1,26 @@
+# Environments
+.env
+.venv
+venv/
+__pycache__/
+
+# Archivos pesados o de datos
+*.pdf
+errores.txt
+
+# Instaladores y binarios grandes
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.iso
+
+# Archivos comprimidos grandes
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tar.bz2
+
+# Carpetas temporales
+temp/
