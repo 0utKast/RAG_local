@@ -5,6 +5,7 @@ import google.generativeai as genai
 import sentence_transformers
 import chromadb
 import fitz  # PyMuPDF
+import requests
 
 # Cargar variables de entorno
 load_dotenv()
@@ -78,11 +79,11 @@ def api_upload():
                 return jsonify({"message": "El PDF está vacío o no contiene texto."} ), 400
 
             # 2. Dividir el texto en fragmentos (chunks)
-            chunks = text.split('\n\n')
+            chunks = text.split('  \n\n')
             chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
             print(f"[DEBUG] Número de chunks creados: {len(chunks)}")
             if chunks:
-                print(f"[DEBUG] Ejemplo de chunk: '{chunks[0][:100]}...'")
+                print(f"[DEBUG] Ejemplo de chunk: '{chunks[0][:100]}...' ")
 
             if not chunks:
                 print("[DEBUG] No se generaron chunks, no hay nada que añadir a la BD.")
@@ -109,18 +110,21 @@ def api_upload():
     return jsonify({"error": "Formato de archivo no soportado. Por favor, sube un PDF."} ), 400
 
 
+OLLAMA_API_URL = "http://localhost:11434/api/generate"
+
 @app.route('/api/query', methods=['POST'])
 def api_query():
     """
     API endpoint para recibir una pregunta, buscar en la base de datos vectorial
-    y generar una respuesta usando Gemini.
+    y generar una respuesta usando Gemini o Ollama.
     """
     data = request.get_json()
     if not data or 'query' not in data:
         return jsonify({"error": "Pregunta no proporcionada"}), 400
 
     query = data['query']
-    print(f"\n[DEBUG] Recibida nueva pregunta: '{query}'")
+    llm_choice = data.get('llm', 'gemini') # Default to gemini if not provided
+    print(f"\n[DEBUG] Recibida nueva pregunta: '{query}' para el modelo: {llm_choice}")
 
     try:
         # 1. Buscar los chunks más relevantes en ChromaDB
@@ -137,9 +141,9 @@ def api_query():
             return jsonify({"answer": "No encontré información relevante en los documentos para responder a tu pregunta."} )
 
         context = "\n\n".join(results['documents'][0])
-        print(f"[DEBUG] Contexto enviado a Gemini: '{context[:200]}...'")
+        print(f"[DEBUG] Contexto enviado al LLM: '{context[:200]}...' ")
 
-        # 2. Construir el prompt para Gemini
+        # 2. Construir el prompt
         prompt = f"""
         Basándote únicamente en el siguiente contexto extraído de un documento, responde a la pregunta.
         Si la respuesta no se encuentra en el contexto, di "No encontré información relevante en los documentos para responder a tu pregunta.".
@@ -154,12 +158,35 @@ def api_query():
         Respuesta:
         """
 
-        # 3. Generar la respuesta con Gemini
-        response = generation_model.generate_content(prompt)
-        print(f"[DEBUG] Respuesta de Gemini: '{response.text}'\n")
+        llm_response_text = ""
+        if llm_choice == "gemini":
+            # 3. Generar la respuesta con Gemini
+            response = generation_model.generate_content(prompt)
+            llm_response_text = response.text
+            print(f"[DEBUG] Respuesta de Gemini: '{llm_response_text}'\n")
+        elif llm_choice == "ollama":
+            # 3. Generar la respuesta con Ollama
+            ollama_payload = {
+                "model": "llama3", # Usamos llama3 como se mencionó
+                "prompt": prompt,
+                "stream": False
+            }
+            print(f"[DEBUG] Enviando a Ollama: {ollama_payload}")
+            ollama_response = requests.post(OLLAMA_API_URL, json=ollama_payload)
+            ollama_response.raise_for_status() # Raise an exception for HTTP errors
+            llm_response_text = ollama_response.json()['response']
+            print(f"[DEBUG] Respuesta de Ollama: '{llm_response_text}'\n")
+        else:
+            return jsonify({"error": "Modelo LLM no válido seleccionado."}, 400)
 
-        return jsonify({"answer": response.text})
+        return jsonify({"answer": llm_response_text})
 
+    except requests.exceptions.ConnectionError as e:
+        print(f"[ERROR] Error de conexión con Ollama: {str(e)}")
+        return jsonify({"error": f"Error de conexión con Ollama. Asegúrate de que Ollama esté corriendo y el modelo 'llama3' esté disponible. Detalle: {str(e)}"}, 500)
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Error en la solicitud a Ollama: {str(e)}")
+        return jsonify({"error": f"Error en la solicitud a Ollama: {str(e)}"}, 500)
     except Exception as e:
         print(f"[ERROR] {str(e)}")
         return jsonify({"error": f"Error al generar la respuesta: {str(e)}"}), 500
